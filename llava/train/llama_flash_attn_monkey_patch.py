@@ -85,7 +85,9 @@ def forward(
     else:
         nheads = qkv.shape[-2]
         x = rearrange(qkv, "b s three h d -> b s (three h d)")
-        x_unpad, indices, cu_q_lens, max_s = unpad_input(x, key_padding_mask)
+
+        # FIXME (low): used_seqlens_in_batch added by me. Looks like there is a mis-match of flash attention and llava code
+        x_unpad, indices, cu_q_lens, max_s, used_seqlens_in_batch = unpad_input(x, key_padding_mask)
         x_unpad = rearrange(
             x_unpad, "nnz (three h d) -> nnz three h d", three=3, h=nheads
         )
