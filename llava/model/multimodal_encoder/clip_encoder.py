@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from transformers import CLIPVisionModel, CLIPImageProcessor, CLIPVisionConfig
 from open_clip import create_model_and_transforms
+from open_clip.transform import PreprocessCfg
 
 
 class CLIPVisionTower(nn.Module):
@@ -113,8 +114,18 @@ class OpenCLIPVisionTower(nn.Module):
             return
 
         class ImageProcessorWrapper:
-            def __init__(self, img_processor):
+            def __init__(self, img_processor, image_size):
                 self.img_processor = img_processor
+
+                if isinstance(image_size, tuple):
+                    height = image_size[0]
+                    width = image_size[1]
+                else:
+                    height, width = image_size, image_size
+                self.crop_size = {
+                    "height": height,
+                    "width": width
+                }
 
             def __call__(self):
                 return self.img_processor
@@ -129,8 +140,10 @@ class OpenCLIPVisionTower(nn.Module):
 
         # self.image_processor = CLIPImageProcessor.from_pretrained(self.vision_tower_name)
         # self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name, device_map=device_map)
-        self.vision_tower, image_processor = self.create_openclip_model_transform(self.vision_tower_name)
-        self.image_processor = ImageProcessorWrapper(image_processor)
+        self.vision_tower, image_processor = self.create_openclip_model_transform(self.vision_tower_name, self.args)
+        pp_cfg = PreprocessCfg(**self.vision_tower.visual.preprocess_cfg)
+        image_size = pp_cfg.size
+        self.image_processor = ImageProcessorWrapper(image_processor, image_size)
 
         self.vision_tower.requires_grad_(False)
         self.is_loaded = True
@@ -145,29 +158,60 @@ class OpenCLIPVisionTower(nn.Module):
 
             self.vision_tower.config = OpenCLIPConfig(self.vision_tower)
 
-    def create_openclip_model_transform(self, model_name):
+    def create_openclip_model_transform(self, model_path, args):
+        model_kwargs = {}
+        # if args.siglip:
+        #     model_kwargs['init_logit_scale'] = np.log(10)  # different from CLIP
+        #     model_kwargs['init_logit_bias'] = -10
+        if isinstance(args.force_image_size, (tuple, list)) and len(args.force_image_size) == 1:
+            # arg is nargs, single (square) image size list -> int
+            args.force_image_size = args.force_image_size[0]
+
         model, preprocess_train, preprocess_val = create_model_and_transforms(
-                "SEM_ViT-B-16",
-                "/home/mila/s/sarvjeet-singh.ghotra/scratch/git/open_clip/src/logs/SEM_ViT-B-32_laion4/checkpoints/epoch_7.pt",
-                precision="amp_bf16",
-                device=0,
-                jit=False,
-                force_quick_gelu=False,
-                force_custom_text=False,
-                force_patch_dropout=None,
-                force_image_size=None,
-                force_context_length=None,
-                image_mean=None,
-                image_std=None,
-                image_interpolation=None,
-                image_resize_mode=None,
-                aug_cfg={},
-                pretrained_image=False,
-                output_dict=True,
-                cache_dir=None,
-                strict_weight_load=True,
-                **{},
-            )
+            args.vision_model_name,
+            model_path,
+            precision=args.precision,
+            device=args.training_args_device,
+            jit=args.torchscript,
+            force_quick_gelu=args.force_quick_gelu,
+            force_custom_text=args.force_custom_text,
+            force_patch_dropout=args.force_patch_dropout,
+            force_image_size=args.force_image_size,
+            force_context_length=args.force_context_length,
+            image_mean=args.image_mean,
+            image_std=args.image_std,
+            image_interpolation=args.image_interpolation,
+            image_resize_mode=args.image_resize_mode,  # only effective for inference
+            aug_cfg=args.aug_cfg,
+            pretrained_image=args.pretrained_image,
+            output_dict=True,
+            cache_dir=args.vision_cache_dir,
+            strict_weight_load=(not args.non_strict_weight_load),
+            **model_kwargs,
+        )
+
+        # model, preprocess_train, preprocess_val = create_model_and_transforms(
+        #         "SEM_ViT-B-16",
+        #         "/home/mila/s/sarvjeet-singh.ghotra/scratch/git/open_clip/src/logs/SEM_ViT-B-32_laion4/checkpoints/epoch_7.pt",
+        #         precision="amp_bf16",
+        #         device=0,
+        #         jit=False,
+        #         force_quick_gelu=False,
+        #         force_custom_text=False,
+        #         force_patch_dropout=None,
+        #         force_image_size=None,
+        #         force_context_length=None,
+        #         image_mean=None,
+        #         image_std=None,
+        #         image_interpolation=None,
+        #         image_resize_mode=None,
+        #         aug_cfg={},
+        #         pretrained_image=False,
+        #         output_dict=True,
+        #         cache_dir=None,
+        #         strict_weight_load=True,
+        #         **{},
+        #     )
 
         return model, preprocess_train
 

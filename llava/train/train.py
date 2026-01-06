@@ -65,6 +65,44 @@ class ModelArguments:
     mm_patch_merge_type: Optional[str] = field(default='flat')
     mm_vision_select_feature: Optional[str] = field(default="patch")
 
+    vision_model_name: str = field(default=None)
+    precision: str = field(default='bf16')
+    torchscript: bool = field(default=False)
+    force_quick_gelu: bool = field(default=False)
+    force_custom_text: bool = field(default=False)
+    force_patch_dropout: float = field(default=None)
+    force_image_size: Optional[tuple[int, int]] = field(default=None)
+    force_context_length: int = field(default=None)
+    image_mean: Optional[tuple[float, float, float, float]] = field(default=None)
+    image_std: Optional[tuple[float, float, float, float]] = field(default=None)
+    image_interpolation: str = field(default=None)    # ['bicubic', 'bilinear', 'random')]
+    image_resize_mode: str = field(default=None)  # ['shortest', 'longest', 'squash')]
+    aug_cfg: dict = field(default_factory=dict)
+    pretrained_image: bool = field(default=False)
+    vision_cache_dir: str = field(default=None)
+    non_strict_weight_load: bool = field(default=False)
+
+    training_args_device: Optional[str] = field(default=None)
+
+# @dataclass
+# class VisionTowerArguments:
+    # vision_model_name: str = None,
+    # precision: str = 'bf16',
+    # torchscript: bool = False
+    # force_quick_gelu: bool = False,
+    # force_custom_text: bool = False,
+    # force_patch_dropout: float = None,
+    # force_image_size: tuple[int, int] | None = None,
+    # force_context_length: int = None,
+    # image_mean: tuple[float, float, float, float] | None = None,
+    # image_std: tuple[float, float, float, float] | None = None,
+    # image_interpolation: str = None,    # ['bicubic', 'bilinear', 'random']
+    # image_resize_mode: str = None,  # ['shortest', 'longest', 'squash']
+    # aug_cfg: dict = {},
+    # pretrained_image: bool = False,
+    # cache_dir: str = None,
+    # non_strict_weight_load: bool = False
+
 
 @dataclass
 class DataArguments:
@@ -791,6 +829,7 @@ def train(attn_implementation=None):
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    model_args.training_args_device = training_args.device
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
 
@@ -912,7 +951,7 @@ def train(attn_implementation=None):
             model_args=model_args,
             fsdp=training_args.fsdp
         )
-        
+
         vision_tower = model.get_vision_tower()
         vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
 
