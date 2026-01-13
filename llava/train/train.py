@@ -83,6 +83,7 @@ class ModelArguments:
     non_strict_weight_load: bool = field(default=False)
 
     training_args_device: Optional[str] = field(default=None)
+    clip_source: str = field(default='open_clip')
 
 # @dataclass
 # class VisionTowerArguments:
