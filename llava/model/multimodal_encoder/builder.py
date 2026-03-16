@@ -1,5 +1,6 @@
 import os
 from .clip_encoder import CLIPVisionTower, CLIPVisionTowerS2
+from .flair_encoder import FlairVisionTower
 
 
 def build_vision_tower(vision_tower_cfg, **kwargs):
@@ -14,6 +15,8 @@ def build_vision_tower(vision_tower_cfg, **kwargs):
         elif vision_tower_cfg.clip_source == 'open_clip':
             from .clip_encoder import OpenCLIPVisionTower
             return OpenCLIPVisionTower(vision_tower, args=vision_tower_cfg, **kwargs)
+        elif vision_tower_cfg.clip_source == 'flair':
+            return FlairVisionTower(vision_tower, args=vision_tower_cfg, **kwargs)
         else:
             raise ValueError(f'Unknown vision tower: {vision_tower_cfg.clip_source}')
 
